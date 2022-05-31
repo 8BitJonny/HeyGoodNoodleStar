@@ -1,0 +1,17 @@
+{
+  "name": "hey-good-noodle-star",
+  "version": "0.0.1",
+  "description": "A good noodle star variant of hey tacos",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": "16.x"
+  },
+  "author": "8BitJonny",
+  "dependencies": {
+    "@slack/bolt": "^3.3.0"
+  }
+}
