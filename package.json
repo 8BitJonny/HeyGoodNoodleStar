@@ -12,6 +12,7 @@
   },
   "author": "8BitJonny",
   "dependencies": {
-    "@slack/bolt": "^3.3.0"
+    "@slack/bolt": "^3.3.0",
+    "dotenv": "^16.0.1"
   }
 }

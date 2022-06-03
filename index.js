@@ -3,6 +3,8 @@ const store = require('./store')
 const messages = require('./messages')
 const helpers = require('./helpers')
 
+require('dotenv').config()
+
 console.log(process.env.GOODNOODLE_SLACK_BOT_TOKEN)
 console.log(process.env.GOODNOODLE_SLACK_SIGNING_SECRET)
 
@@ -12,7 +14,7 @@ const app = new App({
   // setting `ignoreSelf` to `false` to also retrieve events from our Bot user
   // e.g. we want to know when our Bot users is added to a channel through the
   // `member_joined_channel` event
-  ignoreSelf: false,
+  ignoreSelf: true,
   logLevel: 'DEBUG'
 });
 
@@ -39,6 +41,15 @@ app.event('app_home_opened', async ({ event, say }) => {
     await say(messages.welcome_app_home);
   }
 });
+
+app.message('hello', async ({ message, say }) => {
+  console.log("Hello")
+})
+
+app.message(':good-noodle:', async ({ message, say }) => {
+  console.log(message)
+  say("Alright I'll award you with a :good-noodle:")
+})
 
 /**
 
