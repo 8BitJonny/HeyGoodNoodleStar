@@ -1,6 +1,6 @@
 {
   "name": "hey-good-noodle-star",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A good noodle star variant of hey tacos",
   "main": "index.js",
   "scripts": {
@@ -8,11 +8,13 @@
     "start": "node index.js"
   },
   "engines": {
-    "node": "16.x"
+    "node": "18.x"
   },
   "author": "8BitJonny",
   "dependencies": {
     "@slack/bolt": "^3.3.0",
+    "airtable": "^0.11.4",
+    "dayjs": "^1.11.3",
     "dotenv": "^16.0.1"
   }
 }
