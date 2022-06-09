@@ -12,6 +12,8 @@ require('dotenv').config()
 const app = new App({
   signingSecret: process.env.GOODNOODLE_SLACK_SIGNING_SECRET,
   token: process.env.GOODNOODLE_SLACK_BOT_TOKEN,
+  appToken: process.env.GOODNOODLE_SLACK_APP_LEVEL_TOKEN,
+  socketMode: true,
   ignoreSelf: true,
   logLevel: 'DEBUG'
 });
