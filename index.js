@@ -15,7 +15,15 @@ const app = new App({
   appToken: process.env.GOODNOODLE_SLACK_APP_LEVEL_TOKEN,
   socketMode: true,
   ignoreSelf: true,
-  logLevel: 'DEBUG'
+  logLevel: 'DEBUG',
+  customRoutes: [{
+      path: '/alive',
+      method: ['GET'],
+      handler: (req, res) => {
+        res.writeHead(200);
+        res.end('Health check information displayed here!');
+      },
+    }],
 });
 
 const WEEKLY_TOKEN_AMOUNT = 5
