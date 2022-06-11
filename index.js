@@ -16,9 +16,7 @@ const app = new App({
   clientSecret: process.env.GOODNOODLE_CLIENT_SECRET,
   stateSecret: 'my-secret',
   scopes: ['chat:write', 'reactions:write', 'users.profile:read', 'groups:history', 'im:history', 'mpim:history', 'channels:history'],
-  socketMode: true,
   ignoreSelf: true,
-  logLevel: 'DEBUG',
   customRoutes: [{
     path: '/alive',
     method: ['GET'],
@@ -120,6 +118,7 @@ async function upsertUsers(context, userIDs) {
     if (userExists) {
       return userExists
     } else {
+      console.log({ context })
       const userName = await fetchName(context.botToken, userID)
       return (await insertUser(userID, context.teamId, userName))[0]
     }
@@ -222,7 +221,7 @@ app.message(':good-noodle:', async ({ message, context, say }) => {
   const giftedNoodles = countNoodlesInMessage(message.text);
   console.log({ mentionedUsers, giftedNoodles })
 
-  const [sender, ...recipients] = await upsertUsers(context.botToken, [
+  const [sender, ...recipients] = await upsertUsers(context, [
     message.user,
     ...mentionedUsers
       .filter(u => u !== message.user)
@@ -240,7 +239,7 @@ app.message(':good-noodle:', async ({ message, context, say }) => {
   await addEmoji(app, context, message, 'thumbsup');
 })
 
-app.error(console.error);
+app.error((e) => console.error(JSON.stringify(e)));
 
 (async () => {
   await app.start(process.env.PORT || 3000);
