@@ -67,7 +67,7 @@ const installationTable = airtable('Installation')
 
 const userMentionDetectionRegex = /<@(.*)>/
 const containsUserMention = (string) => userMentionDetectionRegex.test(string)
-const extractUsersFromString = (string) => [...string.matchAll(/<@(.{11})>/g)].map(e => e[1])
+const extractUsersFromString = (string) => [...string.matchAll(/<@([\w\d]+)>/g)].map(e => e[1])
 const countNoodlesInMessage = (string) => [...string.matchAll(/(:good-noodle:)/g)].length
 const addEmoji = (app, context, message, emoji) => app.client.reactions.add({
   token: context.botToken,
