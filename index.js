@@ -118,7 +118,6 @@ async function upsertUsers(context, userIDs) {
     if (userExists) {
       return userExists
     } else {
-      console.log({ context })
       const userName = await fetchName(context.botToken, userID)
       return (await insertUser(userID, context.teamId, userName))[0]
     }
