@@ -20,13 +20,44 @@ const app = new App({
   ignoreSelf: true,
   logLevel: 'DEBUG',
   customRoutes: [{
-      path: '/alive',
-      method: ['GET'],
-      handler: (req, res) => {
-        res.writeHead(200);
-        res.end('Health check information displayed here!');
-      },
-    }],
+    path: '/alive',
+    method: ['GET'],
+    handler: (req, res) => {
+      res.writeHead(200);
+      res.end('Health check information displayed here!');
+    },
+  }],
+  installationStore: {
+    storeInstallation: async (installation) => {
+      if (installation.isEnterpriseInstall && installation.enterprise !== undefined) {
+        return await insertInstallation(installation.enterprise.id, JSON.stringify(installation));
+      }
+      if (installation.team !== undefined) {
+        return await insertInstallation(installation.team.id, JSON.stringify(installation));
+      }
+      throw new Error('Failed saving installation data to installationStore');
+    },
+    fetchInstallation: async (installQuery) => {
+      if (installQuery.isEnterpriseInstall && installQuery.enterpriseId !== undefined) {
+        const result = await getInstallation(installQuery.enterpriseId);
+        return JSON.parse(result.get('Installation'))
+      }
+      if (installQuery.teamId !== undefined) {
+        const result = await getInstallation(installQuery.teamId);
+        return JSON.parse(result.get('Installation'))
+      }
+      throw new Error('Failed fetching installation');
+    },
+    deleteInstallation: async (installQuery) => {
+      if (installQuery.isEnterpriseInstall && installQuery.enterpriseId !== undefined) {
+        return await deleteInstallation(installQuery.enterpriseId);
+      }
+      if (installQuery.teamId !== undefined) {
+        return await deleteInstallation(installQuery.teamId);
+      }
+      throw new Error('Failed to delete installation');
+    },
+  },
 });
 
 const WEEKLY_TOKEN_AMOUNT = 5
@@ -34,6 +65,7 @@ const WEEKLY_TOKEN_AMOUNT = 5
 const airtable = new Airtable({ apiKey: process.env.AIRTABLE_KEY }).base('appF6p1Lb1oJR01eN')
 const userTable = airtable('Users')
 const sendTokensTable = airtable('TokensSend')
+const installationTable = airtable('Installation')
 
 const userMentionDetectionRegex = /<@(.*)>/
 const containsUserMention = (string) => userMentionDetectionRegex.test(string)
@@ -46,6 +78,19 @@ const addEmoji = (app, context, message, emoji) => app.client.reactions.add({
   timestamp: message.ts
 });
 
+
+function insertInstallation(ID, Installation) {
+  return installationTable.create([{ fields: { ID, Installation } }])
+}
+async function getInstallation(ID) {
+  return (await installationTable
+    .select({ maxRecords: 1, filterByFormula: `{ID} = '${ID}'` })
+    .all())[0]
+}
+async function deleteInstallation(ID) {
+  const recordID = (await getInstallation(ID)).id
+  return installationTable.destroy([recordID])
+}
 async function getUser(userID) {
   return (await userTable
     .select({ maxRecords: 1, filterByFormula: `{UserID} = '${userID}'` })
@@ -60,8 +105,8 @@ async function getRemainingWeeklyTokens(userID) {
     ? WEEKLY_TOKEN_AMOUNT - sendTokenAmount
     : 0
 }
-function fetchName(userID) {
-  return app.client.users.profile.get({ user: userID })
+function fetchName(botToken, userID) {
+  return app.client.users.profile.get({ token: botToken, user: userID })
     .then(response => {
       if (!response.ok) {
         Promise.reject(response.error)
@@ -69,30 +114,22 @@ function fetchName(userID) {
       return response.profile.display_name || response.profile.real_name
     })
 }
-async function upsertUsers(userIDs) {
+async function upsertUsers(context, userIDs) {
   return Promise.all(userIDs.map(async (userID) => {
     const userExists = await getUser(userID)
     if (userExists) {
-      return userExists.id
+      return userExists
     } else {
-      const userName = await fetchName(userID)
-      return (await insertUser(userID, userName))[0].id
+      const userName = await fetchName(context.botToken, userID)
+      return (await insertUser(userID, context.teamId, userName))[0]
     }
   }))
 }
-async function getUsers() {
-  return await userTable
-    .select()
-    .all()
+function getUsers(context) {
+  return userTable.select({ filterByFormula: `{TeamID} = '${context.teamId}'` }).all()
 }
-function insertUser(userID, firstName) {
-  return userTable
-    .create([{
-      fields: {
-        UserID: userID,
-        "First Name": firstName,
-      }
-    }])
+function insertUser(UserID, TeamID, FirstName) {
+  return userTable.create([{ fields: { UserID, TeamID, FirstName } }])
 }
 function writeSendNoodlesToDB(transaction) {
   // Transaction length should not exceed 10 per Airtable API
@@ -109,14 +146,14 @@ function writeSendNoodlesToDB(transaction) {
   )
 }
 
-app.event('app_home_opened', async ({ event, say }) => {
-  const users = await getUsers();
+app.event('app_home_opened', async ({ event, context }) => {
+  await upsertUsers(context, [event.user]);
+  const users = await getUsers(context);
   const user = users.find((u) => u.get('UserID') === event.user)
   const tokensLeft = await getRemainingWeeklyTokens(event.user)
 
-  // Call views.publish with the built-in client
-  const result = await app.client.views.publish({
-    // Use the user ID associated with the event
+  await app.client.views.publish({
+    token: context.botToken,
     user_id: event.user,
     view: {
       "type": "home",
@@ -124,7 +161,13 @@ app.event('app_home_opened', async ({ event, say }) => {
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": "*Welcome, <@" + event.user + "> :house:*"
+          "text": "Welcome, <@" + event.user + "> to Mrs. Puff's Boating School! Here, Good Noodle stars are rewarded to good people."
+        }
+      }, {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*How it works*\n\n• Everyone has 5 tacos to give each day.\n\n• To give a taco, send someone a message with their username and a :good-noodle:, like this:\n`@username your positive attitude was a real help today! :good-noodle:`\n\n• Two user mentions and two :good-noodle: means you'll be giving away four good noodles (two per mentioned user)"
         }
       }, {
         "type": "header",
@@ -144,7 +187,7 @@ app.event('app_home_opened', async ({ event, say }) => {
         "type": "header",
         "text": {
           "type": "plain_text",
-          "text": "Noodle Received Leaderboard"
+          "text": "Weekly Noodle Leaderboard"
         }
       }, {
         "type": "divider"
@@ -159,6 +202,14 @@ app.event('app_home_opened', async ({ event, say }) => {
             })
             .join('\n\n')
         }
+      }, {
+        "type": "context",
+        "elements": [
+          {
+            "type": "mrkdwn",
+            "text": "Need help? It works on my machine but you can try this <https://www.thisworldthesedays.com/help-article.html|help article>"
+          }
+        ]
       }]
     }
   });
@@ -171,11 +222,12 @@ app.message(':good-noodle:', async ({ message, context, say }) => {
   const giftedNoodles = countNoodlesInMessage(message.text);
   console.log({ mentionedUsers, giftedNoodles })
 
-  const [sender, ...recipients] = await upsertUsers([
+  const [sender, ...recipients] = await upsertUsers(context.botToken, [
     message.user,
     ...mentionedUsers
       .filter(u => u !== message.user)
   ])
+    .then(users => users.map(user => user.id))
   
   const totalTokensToBeSend = recipients.length * giftedNoodles
   const tokensLeft = await getRemainingWeeklyTokens(message.user)
@@ -185,23 +237,15 @@ app.message(':good-noodle:', async ({ message, context, say }) => {
   }
 
   await writeSendNoodlesToDB(recipients.map(recipient => ({ sender, recipient, tokenAmount: giftedNoodles })))
-  
-  const result = await addEmoji(app, context, message, 'thumbsup');
+  await addEmoji(app, context, message, 'thumbsup');
 })
 
 app.error(console.error);
 
 (async () => {
-  console.log(process.env.PORT || 3000)
   await app.start(process.env.PORT || 3000);
-  console.log('⚡️ Bolt app is running!');
-
-  // after the app is started we are going to retrieve our Bot's user id through
-  // the `auth.test` endpoint (https://api.slack.com/methods/auth.test)
-  // and store it for future reference
-  let id = await app.client.auth.test({ token: process.env.GOODNOODLE_SLACK_BOT_TOKEN })
-    .then(result => result.user_id);
-  console.log({ id })
-
-  store.setMe(id);
+  const id = await app.client.auth
+    .test({ token: process.env.GOODNOODLE_SLACK_BOT_TOKEN })
+      .then(result => result.user_id);
+  console.log(`Mrs Puff is running! ID: ${id} Port: ${process.env.PORT || 3000}`);
 })();
